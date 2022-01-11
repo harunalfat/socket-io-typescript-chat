@@ -13,6 +13,8 @@ import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 
 import { MatMenuModule } from '@angular/material/menu';
+import { DialogChannelComponent } from './chat/dialog-channel/dialog-channel.component';
+import { ReactiveFormsModule } from '@angular/forms';
 
 export function HttpLoaderFactory(http: HttpClient) {
   return new TranslateHttpLoader(http);
@@ -20,7 +22,7 @@ export function HttpLoaderFactory(http: HttpClient) {
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent, DialogChannelComponent,
   ],
   imports: [
     BrowserModule,
@@ -30,6 +32,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     SharedModule,
     HttpClientModule,
     MatMenuModule,
+    ReactiveFormsModule,
     TranslateModule.forRoot({
       loader: {
         provide: TranslateLoader,
@@ -39,6 +42,7 @@ export function HttpLoaderFactory(http: HttpClient) {
     })
   ],
   providers: [],
-  bootstrap: [AppComponent]
+  bootstrap: [AppComponent],
+  entryComponents: [DialogChannelComponent]
 })
 export class AppModule { }

@@ -1,13 +1,5 @@
 <div class="row">
 <h2 class="dialog-title" mat-dialog-title>{{ 'Dialog Title' | translate:params }}</h2>
-
-<button mat-icon-button mat-dialog-title [matMenuTriggerFor]="menu" class="button-globe" tabindex="-1">
-  <mat-icon>language</mat-icon>
-</button>
-<mat-menu #menu="matMenu">
-  <button mat-menu-item (click)="switchLanguage('en')"><img alt="flag" src="../../../assets/flags/en.png"> English</button>
-  <button mat-menu-item (click)="switchLanguage('pt')"><img alt="flag" src="../../../assets/flags/pt.png"> Português</button>
-</mat-menu>
 </div>
 
 <mat-dialog-content class="dialog-content">

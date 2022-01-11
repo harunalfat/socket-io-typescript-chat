@@ -1,19 +1,12 @@
 <mat-sidenav-container fullscreen>
   <mat-sidenav #sidenav>
     <mat-nav-list>
-      <mat-list-item href="https://luixaviles.com" target="_blank">
-        <mat-icon mat-list-icon>person</mat-icon>
-        <span mat-line translate>Author</span>
-      </mat-list-item>
-      <mat-list-item href="https://github.com/luixaviles/socket-io-typescript-chat" target="_blank">
-        <mat-icon mat-list-icon>code</mat-icon>
-        <span mat-line translate>Source Code</span>
-      </mat-list-item>
-      <mat-list-item href="https://medium.com/dailyjs/real-time-apps-with-typescript-integrating-web-sockets-node-angular-e2b57cbd1ec1" target="_blank">
-        <mat-icon mat-list-icon>web</mat-icon>
-        <span mat-line translate>Blog Post</span>
+      <mat-list-item *ngFor="let channelName of channelNames; let i = index" (click)=onChannelClick(channelName) [ngClass]="{chosen: currentChannel == channelName}">
+        <mat-icon mat-list-icon>face</mat-icon>
+        <span mat-line translate>{{channelName}}</span>
       </mat-list-item>
     </mat-nav-list>
+    <button (click)="openAddChannelDialog()" class="raised-button" mat-raised-button>Add Channel</button>
   </mat-sidenav>
 
   <div>
@@ -21,7 +14,7 @@
       <button mat-icon-button (click)="sidenav.toggle()">
       <mat-icon>menu</mat-icon>
     </button>
-      <span>Typescript Chat</span>
+      <span>Chirpbird Chat {{currentChannel ? "("+currentChannel+")" : ""}}</span>
     </mat-toolbar>
 
     <div class="app-content">

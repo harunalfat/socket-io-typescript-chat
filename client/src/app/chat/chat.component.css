@@ -1,25 +1,31 @@
 
-[mat-fab] {
+.fab-1 {
     position: absolute;
     right: 2%;
     top: 35px;
     z-index: 1;
 }
 
+.fab-2 {
+    position: absolute;
+    right: 2%;
+    top: 100px;
+    z-index: 1;
+}
+
 .chat-container {
-    position: fixed;
+    position: absolute;
     width: 100%;
     height: 100%;
 }
 
 .chat-input {
-    padding-top: 20px;
-    width: 80%;
+    width: 90%;
 }
 
 .chat-list {
     overflow: auto;
-    position: fixed;
+    position: absolute;
     top: 90px;
     left: 25px;
     right: 25px;
@@ -38,10 +44,12 @@
 }
 
 .chat-footer-container {
-    position:fixed;
-    bottom:25px;
-    left:25px;
+    position:absolute;
+    bottom:120px;
+    left:40px;
     right:25px;
+    align-items: center;
+    justify-content: center;
 }
 
 .chat-notification {

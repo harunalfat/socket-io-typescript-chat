@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, ElementRef } from '@angular/core';
+import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, ElementRef, Output, EventEmitter } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatList, MatListItem } from '@angular/material/list';
 
@@ -11,6 +11,8 @@ import { DialogUserComponent } from './dialog-user/dialog-user.component';
 import { DialogUserType } from './dialog-user/dialog-user-type';
 import { TranslateService } from '@ngx-translate/core';
 import { StoreUserService } from './shared/services/store-user.service';
+import { AppComponent } from '../app.component';
+import { Subject } from 'rxjs';
 
 
 const AVATAR_URL = 'https://api.adorable.io/avatars/285';
@@ -23,7 +25,8 @@ const AVATAR_URL = 'https://api.adorable.io/avatars/285';
 export class ChatComponent implements OnInit, AfterViewInit {
   action = Action;
   user: User;
-  messages: Message[][] = [];
+  currentChannel: string;
+  messages: Message[] = [];
   messageContent: string;
   ioConnection: any;
   storedUserName: string;
@@ -36,6 +39,8 @@ export class ChatComponent implements OnInit, AfterViewInit {
       dialogType: DialogUserType.NEW
     }
   };
+  
+  public static returned: Subject<any> = new Subject();
 
   // getting a reference to the overall list, which is the parent container of the list items
   @ViewChild(MatList, { read: ElementRef, static: true }) matList: ElementRef;
@@ -47,6 +52,11 @@ export class ChatComponent implements OnInit, AfterViewInit {
     private storedUser: StoreUserService,
     public dialog: MatDialog, private translate: TranslateService) {
     translate.setDefaultLang('en');
+    this.storedUser.changeChannel$.subscribe(channelName => {
+      this.messages = this.storedUser.getMessages(channelName)
+
+      this.currentChannel = channelName
+    })
   }
 
   ngOnInit(): void {
@@ -87,11 +97,10 @@ export class ChatComponent implements OnInit, AfterViewInit {
     this.ioConnection = this.socketService.onMessage()
       .subscribe((message: Message) => {
         console.log(message)
+        this.storedUser.storeMessage(message, this.currentChannel)
         
-        if (!this.messages[message.channel]) {
-          this.messages[message.channel] = []
-        }
-        this.messages[message.channel].push(message);
+        if (message.channel === this.currentChannel)
+          this.messages.push(message);
       });
 
 
@@ -132,6 +141,10 @@ export class ChatComponent implements OnInit, AfterViewInit {
       this.user.name = paramsDialog.username;
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
+        this.storedUser.addChannel('lobby');
+        this.currentChannel = 'lobby';
+        
+        this.storedUser.announceInitialChannel('lobby')
         this.storedUser.storeUser(this.user.name);
         this.initIoConnection();
         this.sendNotification(paramsDialog, Action.JOINED);
