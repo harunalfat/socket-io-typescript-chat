@@ -6,7 +6,7 @@
   "author": "Luis Aviles",
   "license": "MIT",
   "scripts": {
-    "start": "nodemon dist/index.js",
+    "start": "gulp build && nodemon dist/index.js",
     "build": "tsc"
   },
   "devDependencies": {

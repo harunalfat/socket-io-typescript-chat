@@ -23,7 +23,7 @@ const AVATAR_URL = 'https://api.adorable.io/avatars/285';
 export class ChatComponent implements OnInit, AfterViewInit {
   action = Action;
   user: User;
-  messages: Message[] = [];
+  messages: Message[][] = [];
   messageContent: string;
   ioConnection: any;
   storedUserName: string;
@@ -86,7 +86,12 @@ export class ChatComponent implements OnInit, AfterViewInit {
 
     this.ioConnection = this.socketService.onMessage()
       .subscribe((message: Message) => {
-        this.messages.push(message);
+        console.log(message)
+        
+        if (!this.messages[message.channel]) {
+          this.messages[message.channel] = []
+        }
+        this.messages[message.channel].push(message);
       });
 
 
@@ -137,14 +142,15 @@ export class ChatComponent implements OnInit, AfterViewInit {
     });
   }
 
-  public sendMessage(message: string): void {
+  public sendMessage(message: string, channel: string): void {
     if (!message) {
       return;
     }
 
     this.socketService.send({
       from: this.user,
-      content: message
+      content: message,
+      channel: channel,
     });
     this.messageContent = null;
   }
@@ -155,11 +161,13 @@ export class ChatComponent implements OnInit, AfterViewInit {
     if (action === Action.JOINED) {
       message = {
         from: this.user,
+        channel: 'lobby',
         action
       };
     } else if (action === Action.RENAME) {
       message = {
         action,
+        channel: 'lobby',
         content: {
           username: this.user.name,
           previousUsername: params.previousUsername
