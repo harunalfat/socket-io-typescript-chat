@@ -1,18 +1,18 @@
-import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, ElementRef, Output, EventEmitter } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, QueryList, ViewChild, ViewChildren } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MatList, MatListItem } from '@angular/material/list';
-
+import { TranslateService } from '@ngx-translate/core';
+import { Subject } from 'rxjs';
+import { DialogPrivateComponent } from './dialog-private/dialog-private.component';
+import { DialogUserType } from './dialog-user/dialog-user-type';
+import { DialogUserComponent } from './dialog-user/dialog-user.component';
 import { Action } from './shared/model/action';
 import { Event } from './shared/model/event';
 import { Message } from './shared/model/message';
 import { User } from './shared/model/user';
-import { SocketService } from './shared/services/socket.service';
-import { DialogUserComponent } from './dialog-user/dialog-user.component';
-import { DialogUserType } from './dialog-user/dialog-user-type';
-import { TranslateService } from '@ngx-translate/core';
-import { StoreUserService } from './shared/services/store-user.service';
-import { AppComponent } from '../app.component';
-import { Subject } from 'rxjs';
+import { ISocketService } from './shared/services/i-socket-service';
+import { IStoreUserService } from './shared/services/i-store-user.service';
+
 
 
 const AVATAR_URL = 'https://api.adorable.io/avatars/285';
@@ -28,9 +28,9 @@ export class ChatComponent implements OnInit, AfterViewInit {
   currentChannel: string;
   messages: Message[] = [];
   messageContent: string;
-  ioConnection: any;
   storedUserName: string;
-  dialogRef: MatDialogRef<DialogUserComponent> | null;
+  dialogUserRef: MatDialogRef<DialogUserComponent> | null;
+  dialogPrivateChannelRef: MatDialogRef<DialogPrivateComponent> | null;
   defaultDialogUserParams: any = {
     disableClose: true,
     data: {
@@ -48,13 +48,13 @@ export class ChatComponent implements OnInit, AfterViewInit {
   // getting a reference to the items/messages within the list
   @ViewChildren(MatListItem, { read: ElementRef }) matListItems: QueryList<MatListItem>;
 
-  constructor(private socketService: SocketService,
-    private storedUser: StoreUserService,
+  constructor(private socketService: ISocketService,
+    private storedUser: IStoreUserService,
     public dialog: MatDialog, private translate: TranslateService) {
     translate.setDefaultLang('en');
-    this.storedUser.changeChannel$.subscribe(channelName => {
+    this.storedUser.getChangeChannelObservable().subscribe(channelName => {
       this.messages = this.storedUser.getMessages(channelName)
-
+      console.log(this.messages)
       this.currentChannel = channelName
     })
   }
@@ -63,7 +63,7 @@ export class ChatComponent implements OnInit, AfterViewInit {
     this.initModel();
     // Using timeout due to https://github.com/angular/angular/issues/14748
     setTimeout(() => {
-      this.openUserPopup(this.defaultDialogUserParams);
+      this.openNewUserPopup(this.defaultDialogUserParams);
     }, 0);
   }
 
@@ -94,15 +94,20 @@ export class ChatComponent implements OnInit, AfterViewInit {
   private initIoConnection(): void {
     this.socketService.initSocket();
 
-    this.ioConnection = this.socketService.onMessage()
+    this.socketService.onMessage()
       .subscribe((message: Message) => {
         console.log(message)
-        this.storedUser.storeMessage(message, this.currentChannel)
+        this.storedUser.storeMessage(message, message.channel)
         
         if (message.channel === this.currentChannel)
           this.messages.push(message);
       });
 
+    this.socketService.onEvent(Event.SUBSCRIBE)
+      .subscribe(data => {
+        console.log(`Server subscribe user [${this.user.name}] to channel [${data.channel.name}]`)
+        
+      })
 
     this.socketService.onEvent(Event.CONNECT)
       .subscribe(() => {
@@ -119,28 +124,38 @@ export class ChatComponent implements OnInit, AfterViewInit {
     return Math.floor(Math.random() * (1000000)) + 1;
   }
 
-  public onClickUserInfo() {
-    this.openUserPopup({
-      data: {
-        username: this.user.name,
-        title: 'Edit Details',
-        title_pt: 'Alterar',
-        dialogType: DialogUserType.EDIT
-      }
-    });
+  public onClickPrivateMessage() {
+    this.dialogPrivateChannelRef = this.dialog.open(DialogPrivateComponent);
+    this.dialogPrivateChannelRef.afterClosed().subscribe(dialogParams => {
+      const username = dialogParams.username
+      if (username == this.user.name) return
+
+      console.log("MASIH MASUKK")
+
+      const joinName: string[] = [this.user.name, username]
+      joinName.sort((l,r) => l < r ? -1 : 1)
+      const privateChannelName = joinName.join(" & ")
+      this.storedUser.addChannel(privateChannelName)
+      this.storedUser.announceInitialChannel(privateChannelName)
+      this.storedUser.storeAllMessages(this.messages, this.currentChannel)
+      this.messages = this.storedUser.getMessages(privateChannelName)
+      this.currentChannel = privateChannelName
+    })
   }
 
-  private openUserPopup(params): void {
-    this.dialogRef = this.dialog.open(DialogUserComponent, params);
-    this.dialogRef.afterClosed().subscribe(paramsDialog => {
+  private openNewUserPopup(params): void {
+    this.dialogUserRef = this.dialog.open(DialogUserComponent, params);
+    this.dialogUserRef.afterClosed().subscribe(paramsDialog => {
       if (!paramsDialog) {
         return;
       }
-      this.storedUserName = this.storedUser.getStoredUser();
-
+  
+      this.storedUserName = JSON.parse(sessionStorage.getItem("user"));
       this.user.name = paramsDialog.username;
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
+        
+        this.messages = this.storedUser.getMessages('lobby')
         this.storedUser.addChannel('lobby');
         this.currentChannel = 'lobby';
         
@@ -148,9 +163,6 @@ export class ChatComponent implements OnInit, AfterViewInit {
         this.storedUser.storeUser(this.user.name);
         this.initIoConnection();
         this.sendNotification(paramsDialog, Action.JOINED);
-      } else if (paramsDialog.dialogType === DialogUserType.EDIT) {
-        this.storedUser.storeUser(this.user.name);
-        this.sendNotification(paramsDialog, Action.RENAME);
       }
     });
   }

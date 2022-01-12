@@ -1,8 +1,6 @@
-import { Component, OnInit, Inject } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { Component, Inject, OnInit } from '@angular/core';
 import { FormControl, Validators } from '@angular/forms';
-import { TranslateService } from '@ngx-translate/core';
-import { StoreUserService } from '../shared/services/store-user.service';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 @Component({
   selector: 'app-dialog-channel',
@@ -11,15 +9,10 @@ import { StoreUserService } from '../shared/services/store-user.service';
 })
 export class DialogChannelComponent implements OnInit {
   channelFormControl = new FormControl('', [Validators.required]);
-  previousUsername: string;
 
   constructor(public dialogRef: MatDialogRef<DialogChannelComponent>,
-    @Inject(MAT_DIALOG_DATA) public params: any,
-    private translate: TranslateService,
-    private storedUser: StoreUserService) {
-    this.previousUsername = storedUser.getStoredUser() ? storedUser.getStoredUser() : (params.username ? params.username : undefined);
+    @Inject(MAT_DIALOG_DATA) public params: any) {
     this.channelFormControl.setValue(null);
-    translate.setDefaultLang('en');
   }
 
   ngOnInit() {
@@ -29,10 +22,6 @@ export class DialogChannelComponent implements OnInit {
     this.dialogRef.close({
       channelName: this.channelFormControl.value,
     });
-  }
-
-  switchLanguage(language: string) {
-    this.translate.use(language);
   }
 
 }

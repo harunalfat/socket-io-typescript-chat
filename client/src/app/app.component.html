@@ -1,4 +1,4 @@
-<mat-sidenav-container fullscreen>
+<mat-sidenav-container autosize fullscreen>
   <mat-sidenav #sidenav>
     <mat-nav-list>
       <mat-list-item *ngFor="let channelName of channelNames; let i = index" (click)=onChannelClick(channelName) [ngClass]="{chosen: currentChannel == channelName}">

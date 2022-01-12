@@ -1,21 +1,27 @@
 import { Injectable } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { Message } from '../model/message';
+import { IStoreUserService } from './i-store-user.service';
 
 const CHANNEL_NAMES = "channelNames";
 
 @Injectable({
   providedIn: 'root'
 })
-export class StoreUserService {
+export class StoreUserService implements IStoreUserService {
 
   constructor() { }
 
   private initialChannelSource = new Subject<string>();
   private changeChannelSource = new Subject<string>();
 
-  initialChannel$ = this.initialChannelSource.asObservable();
-  changeChannel$ = this.changeChannelSource.asObservable();
+  getInitChannelObservable(): Observable<any> {
+    return this.changeChannelSource.asObservable();
+  }
+
+  getChangeChannelObservable(): Observable<any> {
+    return this.initialChannelSource.asObservable()
+  }
 
   /**
    * getStoredUser
@@ -23,6 +29,10 @@ export class StoreUserService {
   public getStoredUser() {
     let storedUser = sessionStorage.getItem("userName");
     return storedUser ? storedUser : "";
+  }
+
+  public getAllUsers(): string[] {
+    return ['apa', 'apakah', 'apee']
   }
 
   /**
@@ -49,16 +59,18 @@ export class StoreUserService {
  }
 
  public storeAllMessages(messages: Message[], channelName: string) {
+    console.log(`Storing messages to : ${channelName}`)
     sessionStorage.setItem(`channels:${channelName}`, JSON.stringify(messages))
  }
 
  public storeMessage(message: Message, channelName: string) {
     const channelMessages = this.getMessages(channelName)
-    console.log(channelMessages)
     channelMessages.push(message)
+    this.storeAllMessages(channelMessages, channelName)
  }
 
  public getMessages(channelName: string): Message[] {
+    console.log(`Get messages from : ${channelName}`)
     const res = JSON.parse(sessionStorage.getItem(`channels:${channelName}`))
     return res ? res : []
  }

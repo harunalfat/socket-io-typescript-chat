@@ -1,3 +1,15 @@
+html, body {
+    overflow: hidden;
+    padding: 10px 5px;
+}
+body {
+    position: relative;
+}
+
+.app-chat {
+    padding: 10px 5px;
+    overflow: hidden;
+}
 
 .fab-1 {
     position: absolute;
@@ -13,23 +25,18 @@
     z-index: 1;
 }
 
-.chat-container {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-}
-
 .chat-input {
-    width: 90%;
+    width: 95%;
 }
 
 .chat-list {
     overflow: auto;
     position: absolute;
-    top: 90px;
+    top: 50px;
     left: 25px;
     right: 25px;
     bottom: 120px;
+    margin-bottom: 70px;
 }
 
 .chat-list-item {
@@ -40,7 +47,10 @@
 }
 
 .main-card {
+    position: fixed;
+    overflow: hidden;
     height: 100%;
+    width: 98%;
 }
 
 .chat-footer-container {
@@ -48,8 +58,6 @@
     bottom:120px;
     left:40px;
     right:25px;
-    align-items: center;
-    justify-content: center;
 }
 
 .chat-notification {

@@ -3,7 +3,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { DialogChannelComponent } from './chat/dialog-channel/dialog-channel.component';
-import { StoreUserService } from './chat/shared/services/store-user.service';
+import { IStoreUserService } from './chat/shared/services/i-store-user.service';
 
 @Component({
   selector: 'app-root',
@@ -19,11 +19,11 @@ export class AppComponent implements OnInit {
 
   constructor(
     public dialog: MatDialog,
-    private storedUserService: StoreUserService,
+    private storedUserService: IStoreUserService,
     private translate: TranslateService,
   ) {
     translate.setDefaultLang('en');
-    storedUserService.initialChannel$.subscribe( channelName => {
+    storedUserService.getInitChannelObservable().subscribe( channelName => {
       this.currentChannel = channelName;
       this.channelNames = this.storedUserService.getAllChannelNames();
     })
@@ -35,8 +35,6 @@ export class AppComponent implements OnInit {
       if (!feedBack?.channelName) return;
 
       this.storedUserService.addChannel(feedBack.channelName);
-      const channels = this.storedUserService.getAllChannelNames();
-
       this.channelNames = this.storedUserService.getAllChannelNames();
     })
   }
