@@ -7,8 +7,9 @@ import { DialogPrivateComponent } from './dialog-private/dialog-private.componen
 import { DialogUserType } from './dialog-user/dialog-user-type';
 import { DialogUserComponent } from './dialog-user/dialog-user.component';
 import { Action } from './shared/model/action';
+import { Channel } from './shared/model/channel';
 import { Event } from './shared/model/event';
-import { Message } from './shared/model/message';
+import { Message, ServerEventWrapper } from './shared/model/message';
 import { User } from './shared/model/user';
 import { ISocketService } from './shared/services/i-socket-service';
 import { IStoreUserService } from './shared/services/i-store-user.service';
@@ -25,7 +26,7 @@ const AVATAR_URL = 'https://api.adorable.io/avatars/285';
 export class ChatComponent implements OnInit, AfterViewInit {
   action = Action;
   user: User;
-  currentChannel: string;
+  currentChannel: Channel;
   messages: Message[] = [];
   messageContent: string;
   storedUserName: string;
@@ -52,15 +53,22 @@ export class ChatComponent implements OnInit, AfterViewInit {
     private storedUser: IStoreUserService,
     public dialog: MatDialog, private translate: TranslateService) {
     translate.setDefaultLang('en');
-    this.storedUser.getChangeChannelObservable().subscribe(channelName => {
-      this.messages = this.storedUser.getMessages(channelName)
-      console.log(this.messages)
-      this.currentChannel = channelName
+    this.storedUser.getChangeChannelObservable().subscribe(passedChannel => {
+      const channels = this.storedUser.getAllChannels()
+      if (channels.find(c => c.id !== passedChannel.id)) {
+        this.socketService.subscribe(passedChannel.id, (message) => {
+          this.onSubscribeMessage(message, passedChannel)
+        })
+      }
+
+      this.messages = this.storedUser.getMessages(passedChannel.id) || []
+      this.currentChannel = passedChannel
+      console.log(this.currentChannel)
     })
   }
 
   ngOnInit(): void {
-    this.initModel();
+    this.user = this.storedUser.getStoredUser();
     // Using timeout due to https://github.com/angular/angular/issues/14748
     setTimeout(() => {
       this.openNewUserPopup(this.defaultDialogUserParams);
@@ -83,29 +91,31 @@ export class ChatComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private initModel(): void {
-    const randomId = this.getRandomId();
-    this.user = {
-      id: randomId,
-      avatar: `${AVATAR_URL}/${randomId}.png`
-    };
+  onSubscribeMessage(message: ServerEventWrapper<Message>, channel: Channel) {
+    this.storedUser.storeMessage(message, message.data.channelId)
+    if (this.currentChannel.id === channel.id) {
+      this.messages.push(message.data)
+      this.storedUser.getMessages(message.data.channelId);
+    }
   }
 
   private initIoConnection(): void {
-    this.socketService.initSocket();
-
-    this.socketService.onMessage()
-      .subscribe((message: Message) => {
-        console.log(message)
-        this.storedUser.storeMessage(message, message.channel)
-        
-        if (message.channel === this.currentChannel)
-          this.messages.push(message);
-      });
+    this.socketService.initSocket(this.user.id);
+    for (const channel of this.user.channels) {
+      if (channel.name === "Lobby") {
+        this.currentChannel = channel
+        this.messages = this.storedUser.getMessages(this.currentChannel.id) || [];
+        console.log(this.messages)
+        this.storedUser.announceInitialChannel(channel)
+      }
+      this.socketService.subscribe(channel.id, (message) => {
+        this.onSubscribeMessage(message, channel)
+      })
+    }
 
     this.socketService.onEvent(Event.SUBSCRIBE)
       .subscribe(data => {
-        console.log(`Server subscribe user [${this.user.name}] to channel [${data.channel.name}]`)
+        console.log(`Server subscribe user [${this.user.username}] to channel [${data.channel.name}]`)
         
       })
 
@@ -115,90 +125,79 @@ export class ChatComponent implements OnInit, AfterViewInit {
       });
 
     this.socketService.onEvent(Event.DISCONNECT)
-      .subscribe(() => {
+      .subscribe((data) => {
         console.log('disconnected');
+        console.log(data)
       });
-  }
-
-  private getRandomId(): number {
-    return Math.floor(Math.random() * (1000000)) + 1;
   }
 
   public onClickPrivateMessage() {
     this.dialogPrivateChannelRef = this.dialog.open(DialogPrivateComponent);
     this.dialogPrivateChannelRef.afterClosed().subscribe(dialogParams => {
       const username = dialogParams.username
-      if (username == this.user.name) return
+      if (username == this.user.username) return
 
       console.log("MASIH MASUKK")
 
-      const joinName: string[] = [this.user.name, username]
+      const joinName: string[] = [this.user.username, username]
       joinName.sort((l,r) => l < r ? -1 : 1)
       const privateChannelName = joinName.join(" & ")
-      this.storedUser.addChannel(privateChannelName)
-      this.storedUser.announceInitialChannel(privateChannelName)
-      this.storedUser.storeAllMessages(this.messages, this.currentChannel)
+      this.storedUser.addChannel(privateChannelName, this.user, true)
+      //this.storedUser.announceInitialChannel(privateChannelName)
+      this.storedUser.storeAllMessages(this.messages, this.currentChannel.id)
       this.messages = this.storedUser.getMessages(privateChannelName)
-      this.currentChannel = privateChannelName
+      this.currentChannel = null
     })
   }
 
   private openNewUserPopup(params): void {
     this.dialogUserRef = this.dialog.open(DialogUserComponent, params);
-    this.dialogUserRef.afterClosed().subscribe(paramsDialog => {
+    this.dialogUserRef.afterClosed().subscribe(async paramsDialog => {
+      console.log(paramsDialog)
       if (!paramsDialog) {
         return;
       }
-  
-      this.storedUserName = JSON.parse(sessionStorage.getItem("user"));
-      this.user.name = paramsDialog.username;
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
-        
-        this.messages = this.storedUser.getMessages('lobby')
-        this.storedUser.addChannel('lobby');
-        this.currentChannel = 'lobby';
-        
-        this.storedUser.announceInitialChannel('lobby')
-        this.storedUser.storeUser(this.user.name);
+        const result = await this.storedUser.storeUser({
+          username: paramsDialog.username,
+        })
+        this.user = result;
+        sessionStorage.setItem("channelList", JSON.stringify(this.user.channels))
         this.initIoConnection();
-        this.sendNotification(paramsDialog, Action.JOINED);
       }
     });
   }
 
   public sendMessage(message: string, channel: string): void {
+    console.log(channel)
     if (!message) {
       return;
     }
 
-    this.socketService.send({
-      from: this.user,
-      content: message,
-      channel: channel,
-    });
+    const msg: Message = {
+      sender: {
+        id: this.user.id,
+        username: this.user.username,
+      },
+      data: message,
+      channelId: channel,
+    }
+
+    this.socketService.send(msg);
     this.messageContent = null;
   }
 
-  public sendNotification(params: any, action: Action): void {
+  public sendNotification(_: any, action: Action): void {
     let message: Message;
 
     if (action === Action.JOINED) {
       message = {
-        from: this.user,
-        channel: 'lobby',
+        sender: this.user,
+        channelId: 'lobby',
         action
       };
-    } else if (action === Action.RENAME) {
-      message = {
-        action,
-        channel: 'lobby',
-        content: {
-          username: this.user.name,
-          previousUsername: params.previousUsername
-        }
-      };
-    }
+    } 
 
     this.socketService.send(message);
   }

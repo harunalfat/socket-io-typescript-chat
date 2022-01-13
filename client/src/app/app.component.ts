@@ -3,6 +3,7 @@ import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { DialogChannelComponent } from './chat/dialog-channel/dialog-channel.component';
+import { Channel } from './chat/shared/model/channel';
 import { IStoreUserService } from './chat/shared/services/i-store-user.service';
 
 @Component({
@@ -12,8 +13,8 @@ import { IStoreUserService } from './chat/shared/services/i-store-user.service';
 })
 export class AppComponent implements OnInit {
 
-  channelNames: string[] = []
-  currentChannel: string = null;
+  channels: Channel[] = []
+  currentChannel: Channel = null;
   dialogRef: MatDialogRef<DialogChannelComponent> | null;
   public static returned: Subject<any> = new Subject()
 
@@ -23,27 +24,30 @@ export class AppComponent implements OnInit {
     private translate: TranslateService,
   ) {
     translate.setDefaultLang('en');
-    storedUserService.getInitChannelObservable().subscribe( channelName => {
-      this.currentChannel = channelName;
-      this.channelNames = this.storedUserService.getAllChannelNames();
+    storedUserService.getInitChannelObservable().subscribe( (channel: Channel) => {
+      this.currentChannel = channel;
+      this.channels = this.storedUserService.getAllChannels();
+      console.log(this.channels)
     })
   }
 
   openAddChannelDialog() {
     this.dialogRef = this.dialog.open(DialogChannelComponent)
-    this.dialogRef.afterClosed().subscribe(feedBack => {
+    this.dialogRef.afterClosed().subscribe(async feedBack => {
       if (!feedBack?.channelName) return;
 
-      this.storedUserService.addChannel(feedBack.channelName);
-      this.channelNames = this.storedUserService.getAllChannelNames();
+      const channel = await this.storedUserService.addChannel(feedBack.channelName, this.storedUserService.getStoredUser(), false);
+      if (!channel) return
+
+      this.channels = this.storedUserService.getAllChannels();
+      this.currentChannel = channel
+      this.storedUserService.announceChangeChannel(channel)
     })
   }
 
-  onChannelClick(channelName: string) {
-    console.log(this.currentChannel)
-    console.log(channelName)
-    this.currentChannel = channelName
-    this.storedUserService.announceChangeChannel(channelName);
+  onChannelClick(channel: Channel) {
+    this.currentChannel = channel
+    this.storedUserService.announceChangeChannel(channel);
   }
 
   ngOnInit(): void {

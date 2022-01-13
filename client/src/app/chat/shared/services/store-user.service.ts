@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { Message } from '../model/message';
+import { User } from '../model/user';
 import { IStoreUserService } from './i-store-user.service';
 
 const CHANNEL_NAMES = "channelNames";
@@ -38,8 +39,11 @@ export class StoreUserService implements IStoreUserService {
   /**
    * storeUser
    */
-  public storeUser(userName) {
+  public storeUser(userName): Promise<User> {
     sessionStorage.setItem("userName", userName);
+    return Promise.resolve({
+      username: userName,
+    })
   }
 
   public getAllChannelNames(): string[] {

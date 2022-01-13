@@ -14,8 +14,9 @@ export class DialogUserComponent implements OnInit {
   constructor(public dialogRef: MatDialogRef<DialogUserComponent>,
     @Inject(MAT_DIALOG_DATA) public params: any,
     private storedUser: IStoreUserService) {
+      console.log(storedUser.getStoredUser())
     this.previousUsername = this.storedUser.getStoredUser() ? this.storedUser.getStoredUser() : (params.username ? params.username : undefined);
-    this.usernameFormControl.setValue(storedUser.getStoredUser() ? storedUser.getStoredUser() : (params.username ? params.username : ""));
+    this.usernameFormControl.setValue(storedUser.getStoredUser() ? storedUser.getStoredUser().username : (params.username ? params.username : ""));
   }
 
   ngOnInit() {

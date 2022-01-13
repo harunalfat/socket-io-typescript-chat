@@ -10,6 +10,7 @@ import { CentrifugeService } from './shared/services/centrifuge-service';
 import { ISocketService } from './shared/services/i-socket-service';
 import { IStoreUserService } from './shared/services/i-store-user.service';
 import { ServerStoreUserService } from './shared/services/server-store-user.service';
+import { SocketService } from './shared/services/socket.service';
 
 
 

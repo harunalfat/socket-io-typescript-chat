@@ -1,9 +1,9 @@
 <mat-sidenav-container autosize fullscreen>
   <mat-sidenav #sidenav>
     <mat-nav-list>
-      <mat-list-item *ngFor="let channelName of channelNames; let i = index" (click)=onChannelClick(channelName) [ngClass]="{chosen: currentChannel == channelName}">
+      <mat-list-item *ngFor="let channel of channels" (click)=onChannelClick(channel) [ngClass]="{chosen: currentChannel.id == channel.id}">
         <mat-icon mat-list-icon>face</mat-icon>
-        <span mat-line translate>{{channelName}}</span>
+        <span mat-line translate>{{channel.name}}</span>
       </mat-list-item>
     </mat-nav-list>
     <button (click)="openAddChannelDialog()" class="raised-button" mat-raised-button>Add Channel</button>
@@ -14,7 +14,7 @@
       <button mat-icon-button (click)="sidenav.toggle()">
       <mat-icon>menu</mat-icon>
     </button>
-      <span>Chirpbird Chat {{currentChannel ? "("+currentChannel+")" : ""}}</span>
+      <span>Chirpbird Chat {{currentChannel?.name ? "("+currentChannel.name+")" : ""}}</span>
     </mat-toolbar>
 
     <div class="app-content">

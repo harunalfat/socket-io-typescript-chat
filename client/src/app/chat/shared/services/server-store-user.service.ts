@@ -1,16 +1,28 @@
 import { Injectable } from "@angular/core";
 import { Observable, Subject } from "rxjs";
 import { Message } from "../model/message";
+import { User } from "../model/user";
 import { IStoreUserService } from "./i-store-user.service";
+import { Axios, AxiosResponse } from "axios";
+import { Channel } from "../model/channel";
+
+interface Response<T> {
+    data: T
+    errors: string[]
+}
 
 @Injectable({
     providedIn: 'root',
 })
 export class ServerStoreUserService implements IStoreUserService {
+
     constructor() {}
 
-    private initialChannelSource = new Subject<string>();
-    private changeChannelSource = new Subject<string>();
+    private initialChannelSource = new Subject<Channel>();
+    private changeChannelSource = new Subject<Channel>();
+    private axios = new Axios({
+        baseURL: "http://localhost:8000"
+    })
 
     getChangeChannelObservable(): Observable<any> {
         return this.changeChannelSource.asObservable();
@@ -21,42 +33,76 @@ export class ServerStoreUserService implements IStoreUserService {
     }
 
     getStoredUser() {
-        return "JAKA"
+        const user = JSON.parse(sessionStorage.getItem("user"))
+        return user
     }
 
     getAllUsers(): string[] {
         throw new Error("Method not implemented.");
     }
 
-    storeUser(userId: string) {
-        throw new Error("Method not implemented.");
+    async storeUser(user: User): Promise<User> {        
+        const res = await this.axios.post<string>('/users', JSON.stringify(user))
+        if (res.status != 201) {
+            console.error("Failed to store user")
+            return
+        }
+
+        console.log(res.data)
+        const resp: Response<User> = JSON.parse(res.data)
+        sessionStorage.setItem("user", JSON.stringify(resp.data))
+        return resp.data
     }
 
-    getAllChannelNames(): string[] {
-        throw new Error("Method not implemented.");
+    getAllChannels(): Channel[] {
+        const res = JSON.parse(sessionStorage.getItem("channelList"))
+        return res
     }
 
-    addChannel(channelId: string) {
-        throw new Error("Method not implemented.");
+    async addChannel(channelName: string, creator: User, isPrivate = false): Promise<Channel> {
+        const channel: Channel = {
+            name: channelName,
+            creatorId: creator.id,
+            isPrivate,
+            hashIdentifier: "",
+        }
+
+        const resp = await this.axios.post<string>(`/channels?userId=${creator.id}`, JSON.stringify(channel))
+        if (resp.status != 201) {
+            console.error("Failed to store channel")
+            return
+        }
+
+        const parsed: Response<any> = JSON.parse(resp.data)
+        const channels = this.getAllChannels()
+        if (channels.find(c => c.id !== parsed.data.channel.id)) {
+            channels.push(parsed.data.channel)
+            channels.sort((a,b) => a.name < b.name ? -1 : 1)
+            sessionStorage.setItem("channelList", JSON.stringify(channels))
+        }
+
+        return parsed.data.channel
     }
 
     storeAllMessages(messages: Message[], channelId: string) {
-        throw new Error("Method not implemented.");
+        sessionStorage.setItem(channelId, JSON.stringify(messages))
     }
 
     storeMessage(message: Message, channelId: string) {
-        throw new Error("Method not implemented.");
+        const messages = this.getMessages(channelId) || []
+        messages.push(message.data)
+        this.storeAllMessages(messages, channelId)
     }
 
     getMessages(channelId: string): Message[] {
-        throw new Error("Method not implemented.");
+        return JSON.parse(sessionStorage.getItem(channelId))
     }
 
-    announceInitialChannel(channelId: string) {
-        throw new Error("Method not implemented.");
+    announceInitialChannel(channel: Channel) {
+        this.initialChannelSource.next(channel)
     }
 
-    announceChangeChannel(channelId: string) {
-        throw new Error("Method not implemented.");
+    announceChangeChannel(channel: Channel) {
+        this.changeChannelSource.next(channel)
     }
 }
