@@ -53,22 +53,22 @@ export class ChatComponent implements OnInit, AfterViewInit {
     private storedUser: IStoreUserService,
     public dialog: MatDialog, private translate: TranslateService) {
     translate.setDefaultLang('en');
-    this.storedUser.getChangeChannelObservable().subscribe(passedChannel => {
-      const channels = this.storedUser.getAllChannels()
-      if (channels.find(c => c.id !== passedChannel.id)) {
+    this.storedUser.getChangeChannelObservable().subscribe(async passedChannel => {
+      console.log(passedChannel)
+      if (passedChannel.isNewlyAdded) {
         this.socketService.subscribe(passedChannel.id, (message) => {
           this.onSubscribeMessage(message, passedChannel)
         })
       }
 
-      this.messages = this.storedUser.getMessages(passedChannel.id) || []
+      this.messages = (await this.storedUser.getMessages(passedChannel.id)) || []
       this.currentChannel = passedChannel
-      console.log(this.currentChannel)
     })
   }
 
   ngOnInit(): void {
     this.user = this.storedUser.getStoredUser();
+    console.log(this.user)
     // Using timeout due to https://github.com/angular/angular/issues/14748
     setTimeout(() => {
       this.openNewUserPopup(this.defaultDialogUserParams);
@@ -99,15 +99,16 @@ export class ChatComponent implements OnInit, AfterViewInit {
     }
   }
 
-  private initIoConnection(): void {
+  private async initIoConnection(): Promise<void> {
     this.socketService.initSocket(this.user.id);
     for (const channel of this.user.channels) {
+
       if (channel.name === "Lobby") {
         this.currentChannel = channel
-        this.messages = this.storedUser.getMessages(this.currentChannel.id) || [];
-        console.log(this.messages)
+        this.messages = await this.storedUser.getMessages(this.currentChannel.id) || [];
         this.storedUser.announceInitialChannel(channel)
       }
+
       this.socketService.subscribe(channel.id, (message) => {
         this.onSubscribeMessage(message, channel)
       })
@@ -120,8 +121,9 @@ export class ChatComponent implements OnInit, AfterViewInit {
       })
 
     this.socketService.onEvent(Event.CONNECT)
-      .subscribe(() => {
+      .subscribe((data) => {
         console.log('connected');
+        console.log(data)
       });
 
     this.socketService.onEvent(Event.DISCONNECT)
@@ -132,45 +134,68 @@ export class ChatComponent implements OnInit, AfterViewInit {
   }
 
   public onClickPrivateMessage() {
-    this.dialogPrivateChannelRef = this.dialog.open(DialogPrivateComponent);
-    this.dialogPrivateChannelRef.afterClosed().subscribe(dialogParams => {
-      const username = dialogParams.username
-      if (username == this.user.username) return
+    this.dialogPrivateChannelRef = this.dialog.open(DialogPrivateComponent, {
+      data: this.user,
+    });
+    this.dialogPrivateChannelRef.afterClosed().subscribe(async dialogParams => {
+      if (!dialogParams) return
 
-      console.log("MASIH MASUKK")
+      const friend = {
+        username: dialogParams.username,
+        id: dialogParams.id,
+      }
 
-      const joinName: string[] = [this.user.username, username]
+      const joinName: string[] = [this.user.username, friend.username]
       joinName.sort((l,r) => l < r ? -1 : 1)
+
       const privateChannelName = joinName.join(" & ")
-      this.storedUser.addChannel(privateChannelName, this.user, true)
-      //this.storedUser.announceInitialChannel(privateChannelName)
-      this.storedUser.storeAllMessages(this.messages, this.currentChannel.id)
-      this.messages = this.storedUser.getMessages(privateChannelName)
-      this.currentChannel = null
+      const channelInput: Channel = {
+        name: privateChannelName,
+        participants: [{username: this.user.username, id: this.user.id}, friend],
+        creatorId: this.user.id,
+        hashIdentifier: "",
+        isPrivate: true,
+      }
+
+      const channel = await this.storedUser.addChannel(channelInput, this.user.id, true)
+      if (!channel) return
+
+      this.messages = await this.storedUser.getMessages(channel.name)
+      this.currentChannel = channel
+      this.storedUser.announceInitialChannel(this.currentChannel)
+      this.socketService.send('NEW_PRIVATE_CHANNEL', channel)
     })
   }
 
   private openNewUserPopup(params): void {
     this.dialogUserRef = this.dialog.open(DialogUserComponent, params);
     this.dialogUserRef.afterClosed().subscribe(async paramsDialog => {
-      console.log(paramsDialog)
       if (!paramsDialog) {
         return;
       }
 
       if (paramsDialog.dialogType === DialogUserType.NEW) {
+        sessionStorage.clear();
         const result = await this.storedUser.storeUser({
           username: paramsDialog.username,
         })
+        result.channels.sort((a, b) => a.name < b.name ? -1 : 1)
         this.user = result;
         sessionStorage.setItem("channelList", JSON.stringify(this.user.channels))
         this.initIoConnection();
+        this.socketService.subscribe<Channel>('NEW_PRIVATE_CHANNEL', async (wrapper) => {
+          const channel = wrapper.data
+          this.socketService.subscribe<Message>(channel.id, (message) => {
+            this.onSubscribeMessage(message, channel)
+          })
+        })
       }
+      console.log("FINISH INITIALIZATION")
     });
   }
 
-  public sendMessage(message: string, channel: string): void {
-    console.log(channel)
+  public sendMessage(message: string, channelId: string): void {
+    console.log(channelId)
     if (!message) {
       return;
     }
@@ -181,25 +206,12 @@ export class ChatComponent implements OnInit, AfterViewInit {
         username: this.user.username,
       },
       data: message,
-      channelId: channel,
+      channelId: channelId,
+      created: new Date(),
     }
 
-    this.socketService.send(msg);
+    this.socketService.send(msg.channelId, msg);
     this.messageContent = null;
-  }
-
-  public sendNotification(_: any, action: Action): void {
-    let message: Message;
-
-    if (action === Action.JOINED) {
-      message = {
-        sender: this.user,
-        channelId: 'lobby',
-        action
-      };
-    } 
-
-    this.socketService.send(message);
   }
 
   switchLanguage(language: string) {

@@ -22,7 +22,7 @@
       <input matInput
              #inputMessage
              maxlength="140"
-             placeholder="Type your message {{this?.user?.username ? ', '+this.user.username : ''}}"
+             placeholder="Type your message {{user?.username ? ', '+ user.username : ''}}"
              [(ngModel)]="messageContent"
              (keyup.enter)="sendMessage(messageContent, currentChannel.id)">
       <mat-hint align="end">{{inputMessage.value.length}}/140</mat-hint>

@@ -4,6 +4,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Subject } from 'rxjs';
 import { DialogChannelComponent } from './chat/dialog-channel/dialog-channel.component';
 import { Channel } from './chat/shared/model/channel';
+import { ISocketService } from './chat/shared/services/i-socket-service';
 import { IStoreUserService } from './chat/shared/services/i-store-user.service';
 
 @Component({
@@ -13,6 +14,7 @@ import { IStoreUserService } from './chat/shared/services/i-store-user.service';
 })
 export class AppComponent implements OnInit {
 
+  initiated = false
   channels: Channel[] = []
   currentChannel: Channel = null;
   dialogRef: MatDialogRef<DialogChannelComponent> | null;
@@ -21,13 +23,22 @@ export class AppComponent implements OnInit {
   constructor(
     public dialog: MatDialog,
     private storedUserService: IStoreUserService,
+    private socketService: ISocketService,
     private translate: TranslateService,
   ) {
     translate.setDefaultLang('en');
+
     storedUserService.getInitChannelObservable().subscribe( (channel: Channel) => {
       this.currentChannel = channel;
       this.channels = this.storedUserService.getAllChannels();
-      console.log(this.channels)
+
+      if (!this.initiated) {
+        this.socketService.subscribe<Channel>('NEW_PRIVATE_CHANNEL', async (wrapper) => {
+          await this.storedUserService.addChannel(wrapper.data, wrapper.data.creatorId, true)
+          this.channels = this.storedUserService.getAllChannels();
+        })
+      }
+      this.initiated = true
     })
   }
 
@@ -35,17 +46,18 @@ export class AppComponent implements OnInit {
     this.dialogRef = this.dialog.open(DialogChannelComponent)
     this.dialogRef.afterClosed().subscribe(async feedBack => {
       if (!feedBack?.channelName) return;
-
-      const channel = await this.storedUserService.addChannel(feedBack.channelName, this.storedUserService.getStoredUser(), false);
+      const user = this.storedUserService.getStoredUser()
+      const channel = await this.storedUserService.addChannel(feedBack.channelName, user.id, false);
       if (!channel) return
 
       this.channels = this.storedUserService.getAllChannels();
       this.currentChannel = channel
+      channel.isNewlyAdded = true
       this.storedUserService.announceChangeChannel(channel)
     })
   }
 
-  onChannelClick(channel: Channel) {
+  async onChannelClick(channel: Channel) {
     this.currentChannel = channel
     this.storedUserService.announceChangeChannel(channel);
   }

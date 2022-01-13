@@ -12,11 +12,11 @@ export interface Message {
 
 export interface ServerEventWrapper<T> {
     data: T
-    gen: any
-    info: {
+    gen?: any
+    info?: {
         user: string
         client: string
     }
-    offset: number
-    seq: number
+    offset?: number
+    seq?: number
 }
